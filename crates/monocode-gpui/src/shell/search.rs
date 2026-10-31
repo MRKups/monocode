@@ -184,6 +184,7 @@ impl Shell {
         }
         let panel = self.workspace.preferences.search_panel;
         self.close_menu(cx);
+        self.leave_plugin_surface(cx);
         if panel {
             if self.quick_open.is_some() {
                 self.close_quick_open(window, cx);

@@ -707,6 +707,9 @@ pub(crate) struct Shell {
     notes: Option<Entity<Notes>>,
     inbox: Option<Entity<crate::inbox::Inbox>>,
     automations: Option<Entity<crate::automations::Automations>>,
+    /// External process plugins and their native surfaces. `None` unless a
+    /// plugin directory is configured, so normal app behavior is untouched.
+    pub(crate) plugin_host: Option<Entity<crate::plugin_host::PluginSurfaceHost>>,
     active_app_view: Option<app_views::AppView>,
     app_view_events: Vec<Subscription>,
     automation_state: automation_runs::State,
@@ -872,6 +875,7 @@ impl Shell {
             .unwrap_or_else(|| {
                 std::env::temp_dir().join(format!("monocode-remote-{}", std::process::id()))
             });
+        let plugin_location = crate::plugin_host::plugin_directory(&store);
         let remote = Arc::new(monocode_core::remote::Connections::new(remote_dir));
         monocode_core::remote::set_default_connections(remote.clone());
         let quit_remote = remote.clone();
@@ -1091,6 +1095,7 @@ impl Shell {
             notes: None,
             inbox: None,
             automations: None,
+            plugin_host: None,
             active_app_view: None,
             app_view_events: Vec::new(),
             automation_state: Default::default(),
@@ -1198,6 +1203,14 @@ impl Shell {
             latest_state,
             render_passes: 0,
         };
+        if let Some(location) = plugin_location {
+            let host = cx.new(|cx| crate::plugin_host::PluginSurfaceHost::new(location, cx));
+            this.observations.push(cx.observe(&host, |this, _, cx| {
+                this.invalidate_chrome(cx);
+                cx.notify();
+            }));
+            this.plugin_host = Some(host);
+        }
         if !cfg!(test) {
             this.scan_external_editors(cx);
         }
@@ -4100,10 +4113,12 @@ impl Shell {
     }
     pub(crate) fn open(&mut self, id: i64, window: &mut Window, cx: &mut Context<Self>) {
         if self.workspace.review_owners.contains_key(&id) {
+            self.leave_plugin_surface(cx);
             self.open_file_pane(id, window, cx);
             return;
         }
         if self.workspace.mono_panes.contains_key(&id) {
+            self.leave_plugin_surface(cx);
             self.open_mono_pane(id, window, cx);
             return;
         }
@@ -4114,9 +4129,50 @@ impl Shell {
         if !self.session_summaries.contains_key(&id) || self.deleting.contains(&id) {
             return;
         }
+        self.leave_plugin_surface(cx);
         self.navigation_revision += 1;
         self.replace_blank_pane(id, cx);
         self.activate_session(id, window, cx);
+    }
+    /// Open a manifest-declared plugin surface in the workspace body.
+    pub(crate) fn open_plugin_surface(
+        &mut self,
+        plugin_id: String,
+        surface_id: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(host) = self.plugin_host.clone() else {
+            return;
+        };
+        if !host.read(cx).has_surface(&plugin_id, &surface_id) {
+            return;
+        }
+        self.leave_app_views(cx);
+        self.leave_app_search(cx);
+        self.close_preview(cx);
+        self.close_menu(cx);
+        if self.settings.is_some() {
+            self.close_settings(window, cx);
+        }
+        if let Some(monos) = self.monos.clone() {
+            monos.update(cx, |monos, cx| monos.close(cx));
+        }
+        self.navigation_revision += 1;
+        host.update(cx, |host, cx| host.open(&plugin_id, &surface_id, cx));
+        self.update_chat_visibility(cx);
+        self.sync_right_panel(cx);
+        self.invalidate_chrome(cx);
+        cx.notify();
+    }
+    /// A session, app view, search, settings or project is taking the body back.
+    pub(crate) fn leave_plugin_surface(&mut self, cx: &mut Context<Self>) {
+        let Some(host) = self.plugin_host.clone() else {
+            return;
+        };
+        if host.read(cx).is_active() {
+            host.update(cx, |host, cx| host.close(cx));
+        }
     }
     /// Opening a conversation that has no tab takes over a blank pane in the
     /// active tab instead of adding a tab, as in the desktop app.
@@ -4327,6 +4383,7 @@ impl Shell {
         self.selection_anchor = None;
         self.sidebar_target = None;
         self.navigation_revision += 1;
+        self.leave_plugin_surface(cx);
         self.leave_app_views(cx);
         self.leave_app_search(cx);
         self.close_preview(cx);
