@@ -79,6 +79,7 @@ pub struct Submitted;
 /// opposite of its usual follow-up behavior.
 pub struct AlternateSubmitted;
 pub struct Changed;
+pub struct SelectionChanged;
 pub(crate) enum CodeAction {
     Stage(usize),
     Revert(usize),
@@ -242,6 +243,7 @@ pub struct Input {
 impl EventEmitter<Submitted> for Input {}
 impl EventEmitter<AlternateSubmitted> for Input {}
 impl EventEmitter<Changed> for Input {}
+impl EventEmitter<SelectionChanged> for Input {}
 impl EventEmitter<Rejected> for Input {}
 impl EventEmitter<CodeAction> for Input {}
 impl Focusable for Input {
@@ -500,7 +502,17 @@ impl Input {
         self.reveal_code();
         self.selection = range;
         self.reversed = false;
+        if !self.selecting {
+            cx.emit(SelectionChanged);
+        }
         cx.notify();
+    }
+    pub(crate) fn selected_text(&self) -> String {
+        if self.secret || self.selection.is_empty() {
+            return String::new();
+        }
+        let range = self.clip_range(self.selection.clone());
+        self.content[range].to_owned()
     }
     pub fn take(&mut self, cx: &mut Context<Self>) -> Option<String> {
         if self.is_composing() || self.content.trim().is_empty() {
@@ -665,6 +677,9 @@ impl Input {
         let offset = self.clip_offset(offset);
         self.selection = offset..offset;
         self.reversed = false;
+        if !self.selecting {
+            cx.emit(SelectionChanged);
+        }
         cx.notify();
     }
     fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
@@ -681,6 +696,9 @@ impl Input {
         if self.selection.start > self.selection.end {
             self.reversed = !self.reversed;
             self.selection = self.selection.end..self.selection.start;
+        }
+        if !self.selecting {
+            cx.emit(SelectionChanged);
         }
         cx.notify();
     }
@@ -1091,9 +1109,13 @@ impl Input {
             self.move_to(ix, cx)
         }
     }
-    fn mouse_up(&mut self, _: &MouseUpEvent, _: &mut Window, _: &mut Context<Self>) {
+    fn mouse_up(&mut self, _: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
+        let was_selecting = self.selecting;
         self.end_drag();
         self.code_scrollbar_up();
+        if was_selecting {
+            cx.emit(SelectionChanged);
+        }
     }
     fn mouse_move(&mut self, e: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
         self.code_hover(e, cx);
@@ -1112,6 +1134,7 @@ impl Input {
         }
         if e.pressed_button != Some(MouseButton::Left) {
             self.end_drag();
+            cx.emit(SelectionChanged);
             return;
         }
         self.drag_position = Some(e.position);
