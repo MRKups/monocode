@@ -4200,19 +4200,11 @@ impl Shell {
     ) {
         let store = self.store.clone();
         let cwd = self.workspace.project.clone();
-        let kind = self.default_kind();
+        let new_chat_choice::NewChatChoice { kind, model } = self.new_chat_choice(&cwd);
         let focus = self.worktree_focus.get(&cwd).cloned();
         let copy = focus.clone().filter(|f| {
             monocode_core::files::path_key(&f.path) != monocode_core::files::path_key(&cwd)
         });
-        let model = self
-            .workspace
-            .preferences
-            .project_providers
-            .get(&cwd)
-            .and_then(|p| p.models.get(kind.id()))
-            .or(self.workspace.preferences.default_models.get(kind.id()))
-            .cloned();
         let account = crate::accounts::get(cx)
             .map(|center| center.read(cx).selected(kind, &cwd))
             .unwrap_or_default();
