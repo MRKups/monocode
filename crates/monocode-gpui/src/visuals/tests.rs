@@ -956,7 +956,9 @@ fn remote_three_column_layout_and_editor_context_menu_work(cx: &mut TestAppConte
 
     // Simulate a concurrent ui.set arriving while the menu is open (rewriting handler IDs).
     window
-        .update(visual, |view, _, cx| view.set_tree(make_tree("run_sel_v2"), cx))
+        .update(visual, |view, _, cx| {
+            view.set_tree(make_tree("run_sel_v2"), cx)
+        })
         .unwrap();
     visual.run_until_parked();
 

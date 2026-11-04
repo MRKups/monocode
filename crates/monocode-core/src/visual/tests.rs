@@ -67,11 +67,10 @@ fn stale_and_unregistered_handlers_are_rejected() {
     let mut vm = runtime("return () => visual.button('Press',()=>{});");
     let first = vm.render().unwrap();
     vm.dispatch(button(&first), json!(null)).unwrap();
-    assert!(
-        vm.dispatch(button(&first), json!(null))
-            .unwrap_err()
-            .contains("stale")
-    );
+    assert!(vm
+        .dispatch(button(&first), json!(null))
+        .unwrap_err()
+        .contains("stale"));
     // A queued old native event must not stop the currently active controls.
     let fresh = vm.render().unwrap();
     assert!(vm.dispatch(button(&fresh), json!(null)).is_ok());
@@ -110,11 +109,10 @@ fn control_payloads_are_checked_before_callbacks() {
             .as_str()
             .unwrap()
             .to_owned();
-        assert!(
-            vm.dispatch(&id, value)
-                .unwrap_err()
-                .contains("Invalid value")
-        );
+        assert!(vm
+            .dispatch(&id, value)
+            .unwrap_err()
+            .contains("Invalid value"));
     }
 }
 
@@ -199,11 +197,9 @@ fn runaway_initialization_render_and_handler_are_interrupted() {
             .unwrap()
             .contains("time budget")
     );
-    assert!(
-        check("return () => {while(true){} };")
-            .unwrap_err()
-            .contains("time budget")
-    );
+    assert!(check("return () => {while(true){} };")
+        .unwrap_err()
+        .contains("time budget"));
     assert!(
         check("return () => visual.button('Loop',()=>{while(true){}});")
             .unwrap_err()
@@ -214,16 +210,12 @@ fn runaway_initialization_render_and_handler_are_interrupted() {
 
 #[test]
 fn script_errors_keep_actionable_messages() {
-    assert!(
-        check("throw new Error('missing dataset');")
-            .unwrap_err()
-            .contains("missing dataset")
-    );
-    assert!(
-        check("return () => { throw new Error('wrong chart'); };")
-            .unwrap_err()
-            .contains("wrong chart")
-    );
+    assert!(check("throw new Error('missing dataset');")
+        .unwrap_err()
+        .contains("missing dataset"));
+    assert!(check("return () => { throw new Error('wrong chart'); };")
+        .unwrap_err()
+        .contains("wrong chart"));
     assert!(
         check("return () => visual.button('Bad',()=>{throw new Error('bad update')});")
             .unwrap_err()
@@ -376,11 +368,10 @@ fn page_tabs_default_the_nav_width_and_require_one_content_child() {
         ]
     }))
     .unwrap();
-    assert!(
-        bad.validate()
-            .unwrap_err()
-            .contains("at most one content child")
-    );
+    assert!(bad
+        .validate()
+        .unwrap_err()
+        .contains("at most one content child"));
 }
 
 #[test]
@@ -484,7 +475,10 @@ fn compact_editor_spacer_and_selectable_table_validate() {
         "selected": 2
     }))
     .unwrap();
-    assert!(out_of_bounds.validate().unwrap_err().contains("out of bounds"));
+    assert!(out_of_bounds
+        .validate()
+        .unwrap_err()
+        .contains("out of bounds"));
 
     let right_margin_tree: Node = serde_json::from_value(json!({
         "kind": "page_tabs",

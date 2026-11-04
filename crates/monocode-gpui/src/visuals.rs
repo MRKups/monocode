@@ -495,10 +495,9 @@ impl VisualView {
         self.active.insert(key.clone());
         match node {
             Node::Spacer => div().h(px(4.)).into_any_element(),
-            Node::Column { .. }
-            | Node::Row { .. }
-            | Node::Grid { .. }
-            | Node::Card { .. } => self.render_layout(node, key, cx),
+            Node::Column { .. } | Node::Row { .. } | Node::Grid { .. } | Node::Card { .. } => {
+                self.render_layout(node, key, cx)
+            }
             Node::Text {
                 text,
                 size,
@@ -921,9 +920,9 @@ impl VisualView {
             let element = self.node(child, format!("{key}/{i}"), cx);
             let wrapper = if is_row {
                 match child {
-                    Node::Column {
-                        width: Some(w), ..
-                    } => div().w(px(*w)).flex_none().child(element),
+                    Node::Column { width: Some(w), .. } => {
+                        div().w(px(*w)).flex_none().child(element)
+                    }
                     Node::Column {
                         weight: Some(weight),
                         ..
@@ -1150,19 +1149,17 @@ impl VisualView {
                             cx.stop_propagation();
                         }),
                     )
-                    .on_key_down(
-                        cx.listener(move |this, event: &gpui::KeyDownEvent, _, cx| {
-                            let next = match event.keystroke.key.as_str() {
-                                "left" | "down" => current - step,
-                                "right" | "up" => current + step,
-                                "home" => min,
-                                "end" => max,
-                                _ => return,
-                            };
-                            this.dispatch(&keyboard, json!(next.clamp(min, max)), cx);
-                            cx.stop_propagation();
-                        }),
-                    ),
+                    .on_key_down(cx.listener(move |this, event: &gpui::KeyDownEvent, _, cx| {
+                        let next = match event.keystroke.key.as_str() {
+                            "left" | "down" => current - step,
+                            "right" | "up" => current + step,
+                            "home" => min,
+                            "end" => max,
+                            _ => return,
+                        };
+                        this.dispatch(&keyboard, json!(next.clamp(min, max)), cx);
+                        cx.stop_propagation();
+                    })),
             )
             .into_any_element()
     }
@@ -1227,9 +1224,9 @@ impl VisualView {
                     .hover(|s| s.text_color(content(1.)))
                     .focus_visible(|s| s.bg(content(0.05)))
                     .child(label.clone())
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.dispatch(&handler, json!(i), cx)
-                    }))
+                    .on_click(
+                        cx.listener(move |this, _, _, cx| this.dispatch(&handler, json!(i), cx)),
+                    )
                     .on_key_down(cx.listener(move |this, event, _, cx| {
                         if activated(event) {
                             this.dispatch(&keyboard, json!(i), cx);
@@ -1336,9 +1333,8 @@ impl VisualView {
                     this.dispatch_raw(&handler, json!(value), cx);
                 });
             let submit_key = key.clone();
-            let submit_sub = cx.subscribe(
-                &input,
-                move |this, _, _: &crate::input::Submitted, cx| {
+            let submit_sub =
+                cx.subscribe(&input, move |this, _, _: &crate::input::Submitted, cx| {
                     let Some(handler) = this
                         .inputs
                         .get(&submit_key)
@@ -1347,8 +1343,7 @@ impl VisualView {
                         return;
                     };
                     this.dispatch(&handler, Value::Null, cx);
-                },
-            );
+                });
             self.inputs.insert(
                 key.clone(),
                 InputSlot {
